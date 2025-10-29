@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Estate | Живой Интерфейс и Большой Выбор</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение шрифта Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Общие стили для анимаций */
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+
+        /* 1. Анимация Бургер-Меню (Крестик) */
+        .burger-line {
+            display: block; width: 28px; height: 3px; margin: 6px auto;
+            background-color: #333;
+            transition: all 0.3s cubic-bezier(0.8, 0.2, 0.1, 1.2);
+            border-radius: 2px;
+        }
+        .burger-open .line-top { transform: translateY(9px) rotate(45deg); }
+        .burger-open .line-middle { opacity: 0; }
+        .burger-open .line-bottom { transform: translateY(-9px) rotate(-45deg); }
+
+        /* 2. Плавное Появление Модального Окна (Слайд и Fade) */
+        .modal-container { transition: opacity 0.3s ease-in-out; }
+        .modal-content {
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .modal-open .modal-content { transform: translateY(0); }
+
+        /* 3. Появление Элементов при Скролле (Reveal on Scroll - Начальное состояние) */
+        .reveal-item {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.8s cubic-bezier(0.1, 0.8, 0.2, 1.2);
+        }
+        .reveal-item.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 5. Эффект Параллакса (Обновлено на высотные здания) */
+        #parallax-section {
+            background-image: url('https://placehold.co/1920x800/1e3a8a/ffffff?text=Высотные+Здания');
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* 9. 3D-эффект Наклона Карточки */
+        .tilt-card {
+            transform-style: preserve-3d;
+            transition: box-shadow 0.3s ease-out;
+            /* Начальная тень для карточек */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .tilt-card-inner {
+            transition: transform 0.1s ease-out;
+        }
+
+        /* 10. Эффект "Волны" (Ripple) при клике */
+        .ripple-button {
+            position: relative;
+            overflow: hidden;
+            transform: translate3d(0, 0, 0);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .ripple-button:hover {
+            transform: translateY(-2px); /* Эффект подъема при наведении */
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+        .ripple-button:after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px;
+            background: rgba(255, 255, 255, 0.8); opacity: 0; border-radius: 100%;
+            transform: scale(1) translate(-50%, -50%); transition: all 0.5s ease-out; pointer-events: none;
+        }
+        .ripple-button:active:after {
+            transform: scale(20) translate(-50%, -50%); opacity: 1; transition: 0s;
+        }
+
+        /* 15. "Прилипающая" шапка */
+        .header-content { transition: padding 0.3s ease-in-out; padding: 1rem 0; }
+        .header-scrolled .header-content {
+            padding: 0.5rem 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Tabs (для "О Нас") */
+        .tab-content {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .tab-content.active {
+            display: block;
+            opacity: 1;
+        }
+        .active-tab {
+             border-color: #3b82f6 !important;
+             color: #3b82f6 !important;
+        }
+    </style>
+</head>
+<body class="min-h-[400vh] antialiased">
+
+    <!-- 8. Динамический Прогресс-бар -->
+    <div id="scroll-progress" class="fixed top-0 left-0 h-1 bg-blue-600 z-50 transition-all duration-75 ease-out w-0"></div>
+
+    <!-- 15. "Прилипающая" шапка -->
+    <header id="main-header" class="fixed top-0 left-0 right-0 z-40 bg-white transition-all duration-300">
+        <div class="header-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div class="text-2xl font-extrabold text-blue-600">Elite Estate</div>
+
+            <!-- 1. Иконка Бургер-меню -->
+            <button id="burger-btn" class="lg:hidden p-2 rounded-lg transition-colors hover:bg-gray-100">
+                <div class="burger-line line-top"></div>
+                <div class="burger-line line-middle"></div>
+                <div class="burger-line line-bottom"></div>
+            </button>
+
+            <!-- Desktop Menu -->
+            <nav class="hidden lg:flex space-x-8 text-gray-600 font-medium">
+                <a href="#hero" class="hover:text-blue-500 transition-colors">Главная</a>
+                <a href="#about-us" class="hover:text-blue-500 transition-colors">О нас</a>
+                <a href="#listings" class="hover:text-blue-500 transition-colors">Объекты (27+)</a>
+                <a href="#stats" class="hover:text-blue-500 transition-colors">Статистика</a>
+                <a href="#accordion" class="hover:text-blue-500 transition-colors">FAQ</a>
+                <button id="open-modal-btn" class="text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors font-semibold ripple-button">Заказать просмотр</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation -->
+    <div id="mobile-menu" class="fixed top-[4rem] md:top-[5rem] right-0 w-64 h-full bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-30 lg:hidden rounded-l-lg">
+        <nav class="flex flex-col p-6 space-y-4 font-medium text-gray-700">
+            <a href="#hero" class="hover:text-blue-500 transition-colors">Главная</a>
+            <a href="#about-us" class="hover:text-blue-500 transition-colors">О нас</a>
+            <a href="#listings" class="hover:text-blue-500 transition-colors">Объекты</a>
+            <a href="#stats" class="hover:text-blue-500 transition-colors">Статистика</a>
+            <a href="#accordion" class="hover:text-blue-500 transition-colors">FAQ</a>
+            <button id="open-modal-btn-mobile" class="w-full text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors font-semibold ripple-button">Заказать просмотр</button>
+        </nav>
+    </div>
+
+    <!-- 2. Модальное Окно (Slide/Fade) -->
+    <div id="modal" class="modal-container fixed inset-0 bg-black bg-opacity-50 z-50 hidden opacity-0 transition-opacity flex items-center justify-center p-4">
+        <div class="modal-content bg-white p-8 rounded-2xl shadow-2xl max-w-lg w-full mx-auto" style="min-height: 200px;">
+            <h3 class="text-2xl font-bold mb-4 text-gray-800">Забронировать Просмотр</h3>
+            <p class="text-gray-600 mb-6">Оставьте заявку, и наш менеджер свяжется с вами в ближайшее время.</p>
+            <button id="close-modal-btn" class="w-full bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors ripple-button">Закрыть</button>
+        </div>
+    </div>
+
+    <main class="pt-20">
+
+        <!-- Hero Section (7. Эффект Печатающейся Машинки) -->
+        <section id="hero" class="py-24 bg-gradient-to-br from-white to-blue-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h1 class="text-5xl md:text-7xl font-extrabold text-gray-900 mb-6 min-h-[100px]">
+                    <span id="typing-text" class="border-r-4 border-blue-600 pr-1"></span>
+                </h1>
+                <p class="text-xl text-gray-500 max-w-4xl mx-auto mb-8">
+                    Мы помогаем найти и приобрести идеальное жилье в кратчайшие сроки с минимальными усилиями.
+                </p>
+                <button id="trigger-shake" class="mt-4 bg-pink-600 text-white py-3 px-10 rounded-xl text-lg font-semibold hover:bg-pink-700 transition-colors shadow-lg ripple-button">
+                    Проверить форму
+                </button>
+            </div>
+        </section>
+        
+        <!-- НОВАЯ СЕКЦИЯ: О Нас (Слайды/Табы) -->
+        <section id="about-us" class="py-24 bg-white reveal-item">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-4xl font-bold text-center text-gray-800 mb-12">О Нас: Наша История и Принципы </h2>
+
+                <!-- Tab Navigation -->
+                <div class="flex flex-wrap justify-center border-b border-gray-200 mb-10">
+                    <button data-tab="mission" class="tab-button py-3 px-6 text-lg font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-600 transition-colors">
+                        Миссия
+                    </button>
+                    <button data-tab="team" class="tab-button py-3 px-6 text-lg font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-600 transition-colors">
+                        Команда
+                    </button>
+                    <button data-tab="history" class="tab-button py-3 px-6 text-lg font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-600 transition-colors">
+                        История Успеха
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="p-6 bg-gray-50 rounded-2xl shadow-xl">
+                    <!-- Слайд 1: Миссия -->
+                    <div id="mission" class="tab-content active">
+                        <h3 class="text-3xl font-bold text-blue-600 mb-4">Наша Миссия</h3>
+                        <p class="text-gray-700 leading-relaxed">
+                            Мы стремимся изменить процесс покупки и продажи недвижимости, сделав его максимально прозрачным, быстрым и беззаботным для наших клиентов. Мы не просто продаем квадратные метры, мы создаем идеальные условия для вашей новой жизни. Наша цель — быть самым доверенным агентством недвижимости в регионе, устанавливая новые стандарты обслуживания.
+                        </p>
+                        <ul class="list-disc list-inside mt-4 text-gray-600">
+                            <li>Ориентация на клиента и его долгосрочные потребности.</li>
+                            <li>Полная юридическая поддержка на всех этапах сделки.</li>
+                            <li>Использование передовых технологий для эффективного поиска.</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Слайд 2: Команда -->
+                    <div id="team" class="tab-content">
+                        <h3 class="text-3xl font-bold text-blue-600 mb-4">Экспертная Команда</h3>
+                        <p class="text-gray-700 leading-relaxed">
+                            Наша команда состоит из более чем 50 сертифицированных агентов, юристов и финансовых консультантов с суммарным опытом более 100 лет. Мы специализируемся на всех сегментах рынка, от элитных пентхаусов до коммерческих объектов. Мы гордимся тем, что каждый наш сотрудник — это не просто профессионал, а настоящий энтузиаст своего дела.
+                        </p>
+                        <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div class="p-3 bg-white rounded-xl shadow-md">
+                                <span class="text-xl font-bold text-gray-800 block">50+</span>
+                                <span class="text-sm text-gray-500">Агентов</span>
+                            </div>
+                            <div class="p-3 bg-white rounded-xl shadow-md">
+                                <span class="text-xl font-bold text-gray-800 block">10+</span>
+                                <span class="text-sm text-gray-500">Юристов</span>
+                            </div>
+                            <div class="p-3 bg-white rounded-xl shadow-md">
+                                <span class="text-xl font-bold text-gray-800 block">24/7</span>
+                                <span class="text-sm text-gray-500">Поддержка</span>
+                            </div>
+                            <div class="p-3 bg-white rounded-xl shadow-md">
+                                <span class="text-xl font-bold text-gray-800 block">18</span>
+                                <span class="text-sm text-gray-500">Партнеров-банков</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Слайд 3: История Успеха -->
+                    <div id="history" class="tab-content">
+                        <h3 class="text-3xl font-bold text-blue-600 mb-4">История Успеха</h3>
+                        <p class="text-gray-700 leading-relaxed mb-6">
+                            Компания Elite Estate была основана в 2008 году как небольшое семейное агентство. За 15 лет мы выросли в лидера рынка, совершив более 780 успешных сделок. Наш рост обусловлен одним простым принципом: всегда ставить интересы клиента на первое место. Мы постоянно инвестируем в обучение персонала и технологические решения, чтобы оставаться на шаг впереди.
+                        </p>
+                        <div class="border-l-4 border-blue-500 pl-4 bg-blue-50 p-4 rounded-lg">
+                            <p class="italic text-gray-700">"В 2023 году мы были признаны 'Агентством года' за инновационный подход к цифровизации сделок."</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Секция Параллакса -->
+        <section id="parallax-section" class="h-[60vh] flex items-center justify-center text-white text-center shadow-inner" data-speed="0.5">
+            <div class="bg-black bg-opacity-50 p-10 rounded-2xl reveal-item">
+                <h2 class="text-4xl font-bold mb-3">Виды на высотные здания </h2>
+                
+                <p class="text-xl">Почувствуйте атмосферу мегаполиса, не выходя из дома.</p>
+            </div>
+        </section>
+
+        <!-- 3. Секция Объектов (27+ Выбор) -->
+        <section id="listings" class="py-24 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center text-gray-800 mb-12">Более 27 Эксклюзивных Объектов </h2>
+                <!-- Контейнер для всех 27+ объектов -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="listings-grid">
+                    
+                    <!-- Шаблон Карточки (Скрипт использует этот шаблон для вставки в DOM) -->
+                    <!-- ВАЖНО: Карточка должна содержать классы reveal-item и tilt-card -->
+                    <script id="listing-template" type="text/template">
+                        <div class="p-0 bg-gray-50 rounded-2xl overflow-hidden" style="perspective: 1000px;">
+                            <div class="tilt-card-inner h-full transition-transform">
+                                <img src="{IMAGE_URL}" onerror="this.onerror=null;this.src='https://placehold.co/600x400/94a3b8/ffffff?text=Image+Not+Found';" alt="{TITLE}" class="w-full h-48 object-cover">
+                                <div class="p-6">
+                                    <h3 class="text-xl font-bold mb-2 text-gray-800">{TITLE}</h3>
+                                    <p class="text-gray-600 mb-4 text-sm">{DESCRIPTION}</p>
+                                    <span class="inline-block bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">{PRICE} $</span>
+                                </div>
+                            </div>
+                        </div>
+                    </script>
+
+                    <!-- Элементы будут сгенерированы сюда JS -->
+                </div>
+                <div class="text-center mt-12">
+                    <button class="bg-blue-600 text-white py-3 px-8 rounded-xl hover:bg-blue-700 transition-colors font-semibold ripple-button">
+                        Загрузить еще объекты
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. Анимированный Счетчик Чисел -->
+        <section id="stats" class="py-24 bg-gray-100 reveal-item">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center text-gray-800 mb-12">Elite Estate в цифрах </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                    <!-- Элементы с целевым значением (data-target) -->
+                    <div class="bg-white p-8 rounded-2xl shadow-xl reveal-item">
+                        <div class="text-6xl font-extrabold text-blue-600 mb-2" data-target="780">0</div>
+                        <p class="text-gray-500 text-lg">Проданных объектов</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-2xl shadow-xl reveal-item" data-delay="150">
+                        <div class="text-6xl font-extrabold text-blue-600 mb-2" data-target="15">0</div>
+                        <p class="text-gray-500 text-lg">Лет на рынке</p>
+                    </div>
+                    <div class="bg-white p-8 rounded-2xl shadow-xl reveal-item" data-delay="300">
+                        <div class="text-6xl font-extrabold text-blue-600 mb-2" data-target="99.8">0</div>
+                        <p class="text-gray-500 text-lg">Процент успеха</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 4. Секция Аккордеона (FAQ) -->
+        <section id="accordion" class="py-24 bg-white">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center text-gray-800 mb-12">Часто задаваемые вопросы </h2>
+
+                <div class="space-y-4">
+                    <!-- Item 1 (FAQ) -->
+                    <div class="accordion-item border border-gray-200 rounded-xl overflow-hidden shadow-md">
+                        <button class="accordion-header w-full flex justify-between items-center p-5 bg-gray-50 hover:bg-gray-100 transition-colors text-lg font-semibold text-gray-700">
+                            Какие документы нужны для сделки?
+                            <svg class="w-6 h-6 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="accordion-content bg-white p-0">
+                            <p class="px-5 text-gray-600 pb-1">Как правило, это паспорт, свидетельство о праве собственности (или выписка из ЕГРН), а также нотариально заверенное согласие супруга (если применимо). Наш юрист поможет собрать полный пакет.</p>
+                        </div>
+                    </div>
+                    <!-- Item 2 (FAQ) -->
+                    <div class="accordion-item border border-gray-200 rounded-xl overflow-hidden shadow-md">
+                        <button class="accordion-header w-full flex justify-between items-center p-5 bg-gray-50 hover:bg-gray-100 transition-colors text-lg font-semibold text-gray-700">
+                            Как работает ипотека с нашим агентством?
+                            <svg class="w-6 h-6 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="accordion-content bg-white p-0">
+                            <p class="px-5 text-gray-600 pb-1">Мы сотрудничаем с ведущими банками и предлагаем специальные условия. Наш ипотечный брокер бесплатно подберет наиболее выгодную программу и поможет оформить заявку.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 14. Скрытое Поле для Shake Теста -->
+        <div class="py-12 flex justify-center bg-gray-50">
+            <div class="p-8 bg-white rounded-xl shadow-lg w-full max-w-md">
+                 <h3 class="text-xl font-bold mb-4 text-gray-800">Проверка формы (Shake 14)</h3>
+                 <input id="shake-input" type="text" placeholder="Введите ваш email для проверки..." class="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 transition">
+                 <p class="text-sm text-gray-500 mt-2">Нажмите кнопку вверху, чтобы увидеть эффект "тряски" (Shake) при ошибке ввода.</p>
+            </div>
+        </div>
+
+
+    </main>
+
+    <!-- JavaScript для всей интерактивности и анимаций -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            /* --- Data Definitions --- */
+            const listingData = [
+                { title: "Роскошная квартира в центре", desc: "2 комнаты, 85 м², 15 этаж. Современный дизайн.", price: 350000, image: "https://placehold.co/600x400/22c55e/ffffff?text=City+Apartment" },
+                { title: "Загородный дом с участком", desc: "4 спальни, 200 м², 12 соток. Тихий район.", price: 580000, image: "https://placehold.co/600x400/ef4444/ffffff?text=Country+House" },
+                { title: "Уникальный лофт-проект", desc: "Свободная планировка, высокие потолки. Для творчества.", price: 410000, image: "https://placehold.co/600x400/eab308/ffffff?text=Unique+Loft" },
+                { title: "Студия у моря", desc: "1 комната, 40 м², Идеально для инвестиций.", price: 150000, image: "https://placehold.co/600x400/6366f1/ffffff?text=Sea+View+Studio" },
+                { title: "Пентхаус с террасой", desc: "5 комнат, 300 м², панорамный вид.", price: 1200000, image: "https://placehold.co/600x400/f97316/ffffff?text=Luxury+Penthouse" },
+                { title: "Таунхаус в пригороде", desc: "3 этажа, 180 м², собственный гараж.", price: 495000, image: "https://placehold.co/600x400/06b6d4/ffffff?text=Townhouse+View" },
+                { title: "Квартира в историческом здании", desc: "3 комнаты, отреставрированный интерьер.", price: 620000, image: "https://placehold.co/600x400/8b5cf6/ffffff?text=Historic+Home" },
+                { title: "Участок под застройку", desc: "25 соток. Все коммуникации подведены.", price: 210000, image: "https://placehold.co/600x400/34d399/ffffff?text=Land+Plot" },
+                { title: "Коммерческое помещение", desc: "120 м², первый этаж, высокий трафик.", price: 750000, image: "https://placehold.co/600x400/fb923c/ffffff?text=Commercial+Space" },
+            ];
+
+            /* --- 3. & 9. Динамическая Генерация Объектов (ИСПРАВЛЕНО) --- */
+            const generateAndObserveListings = () => {
+                const listingsGrid = document.getElementById('listings-grid');
+                const templateScript = document.getElementById('listing-template');
+
+                if (listingsGrid && templateScript) {
+                    const template = templateScript.innerHTML;
+                    const listingsContainer = document.createDocumentFragment();
+                    
+                    // Генерируем 3 полных набора данных (9 * 3 = 27 объектов)
+                    for (let i = 0; i < 3; i++) {
+                        listingData.forEach((data, index) => {
+                            const totalIndex = i * 9 + index + 1;
+                            
+                            // Заменяем плейсхолдеры
+                            let html = template
+                                .replace('{IMAGE_URL}', data.image)
+                                .replace('{TITLE}', data.title + ` (№${totalIndex})`)
+                                .replace('{DESCRIPTION}', data.desc)
+                                .replace('{PRICE}', data.price.toLocaleString('ru-RU'));
+                            
+                            const div = document.createElement('div');
+                            div.innerHTML = html;
+                            
+                            // ИСПРАВЛЕНИЕ: Используем firstElementChild вместо firstChild
+                            const card = div.firstElementChild; 
+                            
+                            if (card) {
+                                // 3. Плавное Появление: Установка задержки и класса
+                                card.setAttribute('data-delay', (totalIndex - 1) * 50); 
+                                card.classList.add('reveal-item', 'tilt-card'); 
+                                listingsContainer.appendChild(card);
+                            } else {
+                                console.error("Ошибка при создании карточки объекта из шаблона.");
+                            }
+                        });
+                    }
+                    listingsGrid.appendChild(listingsContainer);
+                    
+                    // После генерации, инициализируем эффекты для новых элементов
+                    initObserversAndTilt();
+                }
+            };
+            
+            /* --- 3 & 6 & 9. Инициализация Наблюдателей и 3D Наклона --- */
+            const initObserversAndTilt = () => {
+                // 3. Reveal Items (включая только что добавленные)
+                const newRevealItems = document.querySelectorAll('.reveal-item:not(.is-visible)');
+                
+                const observer = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const element = entry.target;
+                            const delay = parseInt(element.getAttribute('data-delay') || '0');
+                            
+                            if (element.classList.contains('reveal-item')) {
+                                setTimeout(() => {
+                                    element.classList.add('is-visible');
+                                }, delay);
+                                // Если элемент не является секцией статистики, прекращаем наблюдение
+                                if (element.id !== 'stats') {
+                                    observer.unobserve(element);
+                                }
+                            }
+                            
+                            // 6. Number Counter logic (запускаем, если видим секцию stats)
+                            if (element.id === 'stats' && !window.countersAnimated) {
+                                document.querySelectorAll('[data-target]').forEach(startCounter);
+                                window.countersAnimated = true;
+                            }
+                        }
+                    });
+                }, { threshold: 0.1 }); 
+
+                newRevealItems.forEach(item => observer.observe(item));
+
+                // Убеждаемся, что stats наблюдается
+                const statsSection = document.getElementById('stats');
+                if (statsSection) observer.observe(statsSection);
+
+                // 9. Tilt Effect
+                const tiltCards = document.querySelectorAll('.tilt-card');
+                const maxTilt = 5;
+
+                const handleTilt = (e) => {
+                    const card = e.currentTarget;
+                    const inner = card.querySelector('.tilt-card-inner');
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    const rotateY = (x - centerX) / centerX * maxTilt * -1;
+                    const rotateX = (y - centerY) / centerY * maxTilt;
+
+                    inner.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.01)`;
+                    card.style.boxShadow = `0 15px 30px rgba(0, 0, 0, 0.3), 0 0 5px rgba(0, 0, 0, 0.1) inset`;
+                };
+
+                const resetTilt = (e) => {
+                    const card = e.currentTarget;
+                    const inner = card.querySelector('.tilt-card-inner');
+                    inner.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+                    card.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                };
+
+                tiltCards.forEach(card => {
+                    // Удаляем старые, если они были применены ранее
+                    card.removeEventListener('mousemove', handleTilt); 
+                    card.removeEventListener('mouseleave', resetTilt);
+                    
+                    // Добавляем новые
+                    card.addEventListener('mousemove', handleTilt);
+                    card.addEventListener('mouseleave', resetTilt);
+                });
+            };
+
+            // 6. Number Counter Function
+            const startCounter = (element) => {
+                const targetText = element.getAttribute('data-target');
+                let target;
+                let isFloat = targetText.includes('.');
+
+                if (isFloat) { target = parseFloat(targetText); } else { target = parseInt(targetText.replace(/,/g, '')); }
+
+                let current = 0;
+                const duration = 2000;
+                const start = performance.now();
+
+                const update = (timestamp) => {
+                    const elapsed = timestamp - start;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    if (isFloat) {
+                        current = (progress * target);
+                        element.textContent = current.toFixed(1).replace('.', ',');
+                    } else {
+                        current = Math.floor(progress * target);
+                        element.textContent = current.toLocaleString('ru-RU');
+                    }
+
+                    if (progress < 1) {
+                        requestAnimationFrame(update);
+                    } else {
+                        element.textContent = isFloat ? target.toFixed(1).replace('.', ',') : target.toLocaleString('ru-RU');
+                    }
+                };
+                requestAnimationFrame(update);
+            };
+
+            /* --- 1. & 15. Header, Burger, Mobile Menu Logic --- */
+            const header = document.getElementById('main-header');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const burgerBtn = document.getElementById('burger-btn');
+
+            const toggleMenu = () => {
+                const isOpen = burgerBtn.classList.toggle('burger-open');
+                mobileMenu.classList.toggle('translate-x-full', !isOpen);
+            };
+            burgerBtn.addEventListener('click', toggleMenu);
+            mobileMenu.querySelectorAll('a, button').forEach(el => {
+                el.addEventListener('click', () => { if (burgerBtn.classList.contains('burger-open')) toggleMenu(); });
+            });
+            const handleHeaderScroll = () => { header.classList.toggle('header-scrolled', window.scrollY > 50); };
+            window.addEventListener('scroll', handleHeaderScroll);
+            handleHeaderScroll();
+
+            /* --- 7. Typing Effect --- */
+            const typingElement = document.getElementById('typing-text');
+            const textToType = "Найдите жилье мечты!";
+            let charIndex = 0;
+            let typingInterval;
+            const typeText = () => {
+                if (charIndex < textToType.length) {
+                    typingElement.textContent += textToType.charAt(charIndex++);
+                } else {
+                    clearInterval(typingInterval);
+                    typingElement.classList.remove('border-r-4');
+                }
+            };
+            setTimeout(() => { typingInterval = setInterval(typeText, 90); }, 500);
+
+            /* --- 2. Modal Logic --- */
+            const modal = document.getElementById('modal');
+            const openModalBtns = document.querySelectorAll('#open-modal-btn, #open-modal-btn-mobile');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                setTimeout(() => { modal.classList.add('opacity-100', 'modal-open'); }, 10);
+            };
+            const closeModal = () => {
+                modal.classList.remove('opacity-100', 'modal-open');
+                setTimeout(() => { modal.classList.add('hidden'); }, 400);
+            };
+            openModalBtns.forEach(btn => btn.addEventListener('click', openModal));
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+            /* --- Tabs/Slides для "О Нас" (ИСПРАВЛЕНО - автоматическая инициализация) --- */
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            const switchTab = (button) => {
+                const targetId = button.getAttribute('data-tab');
+
+                // Сброс стилей кнопок
+                tabButtons.forEach(btn => btn.classList.remove('active-tab', 'text-blue-600', 'border-blue-600'));
+                button.classList.add('active-tab', 'text-blue-600', 'border-blue-600');
+                
+                // Скрытие/Показ контента
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === targetId) {
+                        content.classList.add('active');
+                    }
+                });
+            };
+
+            tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button)));
+            
+            // Инициализация: Кликаем по первой вкладке (Миссия)
+            const firstTab = document.querySelector('[data-tab="mission"]');
+            if (firstTab) switchTab(firstTab);
+
+            /* --- 4. Accordion Logic --- */
+            document.querySelectorAll('.accordion-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const item = header.closest('.accordion-item');
+                    const content = item.querySelector('.accordion-content');
+                    const icon = header.querySelector('svg');
+                    const isOpen = item.classList.contains('open');
+
+                    document.querySelectorAll('.accordion-item.open').forEach(openItem => {
+                        if (openItem !== item) {
+                            openItem.classList.remove('open');
+                            openItem.querySelector('.accordion-content').style.maxHeight = '0';
+                            openItem.querySelector('svg').style.transform = 'rotate(0deg)';
+                        }
+                    });
+
+                    if (isOpen) {
+                        content.style.maxHeight = '0';
+                        icon.style.transform = 'rotate(0deg)';
+                        item.classList.remove('open');
+                    } else {
+                        item.classList.add('open');
+                        content.style.maxHeight = content.scrollHeight + 32 + 'px'; // + padding
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+
+            /* --- 14. Shake Animation --- */
+            const shakeBtn = document.getElementById('trigger-shake');
+            const shakeInput = document.getElementById('shake-input');
+            const shakeClass = 'animate-shake';
+
+            shakeBtn.addEventListener('click', () => {
+                shakeInput.classList.remove(shakeClass);
+                void shakeInput.offsetWidth;
+                shakeInput.classList.add(shakeClass);
+                setTimeout(() => { shakeInput.classList.remove(shakeClass); }, 500);
+            });
+
+            /* --- 8. Scroll Progress Bar --- */
+            const progressBar = document.getElementById('scroll-progress');
+            const handleProgress = () => {
+                const totalHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                const scrollPosition = window.scrollY;
+                const progress = (scrollPosition / totalHeight) * 100;
+                progressBar.style.width = `${progress}%`;
+            };
+            window.addEventListener('scroll', handleProgress);
+            handleProgress();
+
+            /* --- 5. Simple JS Parallax --- */
+            const parallaxSection = document.getElementById('parallax-section');
+            const parallaxSpeed = parseFloat(parallaxSection.getAttribute('data-speed')) || 0.5;
+            const handleParallax = () => {
+                const scrolled = window.scrollY;
+                const yPos = scrolled * parallaxSpeed;
+                parallaxSection.style.backgroundPositionY = `calc(50% + ${yPos * 0.15}px)`;
+            };
+            window.addEventListener('scroll', handleParallax);
+            
+            // Генерируем объекты при старте!
+            generateAndObserveListings();
+            
+        });
+    </script>
+</body>
+</html>
